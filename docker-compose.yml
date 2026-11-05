@@ -1,0 +1,44 @@
+# Redis Streams is the local broker: consumer groups, pending entries, and ack.
+# The default smoke test does not use this file. It uses the pure-Python
+# stand-in in src/andensur/standin.py.
+
+name: andensur
+
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 2s
+      retries: 20
+
+  pipeline:
+    build: .
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./data:/app/data
+    command:
+      - python
+      - -m
+      - andensur
+      - demo
+      - --broker
+      - redis
+      - --redis-url
+      - redis://redis:6379/0
+      - --orders
+      - "120"
+      - --seed
+      - "42"
+      - --fresh
+      - --warehouse
+      - /app/data/warehouse/andensur.duckdb
+      - --archive
+      - /app/data/archive/events.jsonl
+      - --standin-root
+      - /app/data/broker/stand-in
