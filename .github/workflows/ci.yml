@@ -50,3 +50,35 @@ jobs:
           --warehouse "${{ runner.temp }}/andensur.duckdb"
           --archive "${{ runner.temp }}/events.jsonl"
           --standin-root "${{ runner.temp }}/standin"
+
+  site:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+          npm ci --prefix site
+      - name: Generator port matches Python
+        run: |
+          set -euo pipefail
+          for spec in "1 42" "2 42" "40 7" "120 42"; do
+            set -- $spec
+            python -m andensur generate --orders "$1" --seed "$2" --archive "${{ runner.temp }}/py.jsonl"
+            node site/scripts/dump-events.mjs "$1" "$2" "${{ runner.temp }}/js.jsonl"
+            diff -u "${{ runner.temp }}/py.jsonl" "${{ runner.temp }}/js.jsonl"
+          done
+      - name: Build site
+        working-directory: site
+        run: npm run build
