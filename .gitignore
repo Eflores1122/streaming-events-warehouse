@@ -11,3 +11,4 @@ dist/
 *.duckdb.wal
 data/
 .DS_Store
+node_modules/

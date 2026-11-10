@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>Andén Sur. Eventos hacia el warehouse</title>
+    <meta
+      name="description"
+      content="Generador sintético de Andén Sur en el navegador: microlotes, DuckDB y consultas sobre el warehouse."
+    />
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="./src/style.css" />
+  </head>
+  <body>
+    <a class="skip" href="#tablero" data-i18n="skip">Saltar al tablero</a>
+    <header class="wrap mast">
+      <div>
+        <h1>Andén Sur</h1>
+        <p class="lede" data-i18n="lede"></p>
+      </div>
+      <div class="mast-actions">
+        <button type="button" id="lang" class="secondary">English</button>
+        <a href="https://github.com/Eflores1122/streaming-events-warehouse" data-i18n="repo">Repositorio</a>
+      </div>
+    </header>
+    <div class="tape" aria-hidden="true"></div>
+    <main class="wrap">
+      <section id="tablero" aria-labelledby="board-title">
+        <h2 id="board-title" data-i18n="boardTitle"></h2>
+        <form id="controls" class="controls">
+          <label class="field">
+            <span data-i18n="ordersLabel"></span>
+            <input id="orders" type="number" min="1" max="200" step="1" value="120" inputmode="numeric" />
+          </label>
+          <label class="field">
+            <span data-i18n="seedLabel"></span>
+            <input id="seed" type="number" min="0" max="999999" step="1" value="42" inputmode="numeric" />
+          </label>
+          <label class="field">
+            <span data-i18n="batchLabel"></span>
+            <input id="batch" type="number" min="1" max="200" step="1" value="50" inputmode="numeric" />
+          </label>
+          <button type="submit" id="run" data-i18n="run"></button>
+          <button type="button" id="pause" class="secondary" data-i18n="pause" disabled></button>
+          <button type="button" id="download" class="secondary" data-i18n="download"></button>
+        </form>
+        <p id="formula" class="meta"></p>
+        <p id="sample" class="meta"></p>
+        <p id="status" role="status" aria-live="polite"></p>
+        <p id="engine" class="meta"></p>
+        <progress id="progress" max="1" value="0" aria-labelledby="status"></progress>
+        <div class="board">
+          <div class="board-pane">
+            <h3 data-i18n="brokerTitle"></h3>
+            <p id="broker-meta" class="meta"></p>
+            <div class="scroll">
+              <table id="tape">
+                <caption class="sr-only" data-i18n="tapeCaption"></caption>
+                <thead>
+                  <tr>
+                    <th data-i18n="colOffset"></th>
+                    <th data-i18n="colEvent"></th>
+                    <th data-i18n="colType"></th>
+                    <th data-i18n="colTime"></th>
+                    <th data-i18n="colState"></th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="board-pane">
+            <h3 data-i18n="warehouseTitle"></h3>
+            <div class="scroll">
+              <table id="census">
+                <caption class="sr-only" data-i18n="censusCaption"></caption>
+                <thead>
+                  <tr>
+                    <th data-i18n="colRelation"></th>
+                    <th class="optional" data-i18n="colGrain"></th>
+                    <th data-i18n="colRows"></th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+            <p id="watermark" class="meta"></p>
+          </div>
+        </div>
+        <div class="block">
+          <h3 data-i18n="eventsTitle"></h3>
+          <p class="note" data-i18n="eventsNote"></p>
+          <div class="scroll">
+            <table id="events">
+              <thead>
+                <tr>
+                  <th data-i18n="colOffset"></th>
+                  <th data-i18n="colEvent"></th>
+                  <th data-i18n="colType"></th>
+                  <th data-i18n="colTime"></th>
+                  <th data-i18n="colCity"></th>
+                  <th data-i18n="colLate"></th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="block">
+          <h3 data-i18n="batchesTitle"></h3>
+          <div class="scroll">
+            <table id="batches">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th data-i18n="colStarted"></th>
+                  <th data-i18n="colReceived"></th>
+                  <th data-i18n="colInserted"></th>
+                  <th data-i18n="colDup"></th>
+                  <th data-i18n="colLateN"></th>
+                  <th data-i18n="colRejected"></th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="block">
+          <h3 data-i18n="martTitle"></h3>
+          <p class="note" data-i18n="martNote"></p>
+          <div id="bars"></div>
+          <div class="scroll">
+            <table id="mart">
+              <thead>
+                <tr>
+                  <th data-i18n="colHour"></th>
+                  <th data-i18n="colType"></th>
+                  <th data-i18n="colCity"></th>
+                  <th data-i18n="colCount"></th>
+                  <th data-i18n="colLateN"></th>
+                  <th data-i18n="colAmount"></th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+        <p id="match" class="meta"></p>
+        <div class="controls block">
+          <button type="button" id="replay" class="secondary" data-i18n="replay" disabled></button>
+          <button type="button" id="recommit" class="secondary" data-i18n="recommit" disabled></button>
+          <button type="button" id="redeliver" class="secondary" data-i18n="redeliver" disabled></button>
+          <button type="button" id="poison" class="secondary" data-i18n="poison" disabled></button>
+        </div>
+      </section>
+
+      <section id="calidad" aria-labelledby="quality-title">
+        <h2 id="quality-title" data-i18n="qualityTitle"></h2>
+        <p data-i18n="qualityIntro"></p>
+        <p id="quality-summary" class="meta" data-i18n="qualityEmpty"></p>
+        <div class="scroll">
+          <table id="checks">
+            <thead>
+              <tr>
+                <th data-i18n="colCheck"></th>
+                <th data-i18n="colResult"></th>
+                <th data-i18n="colDetail"></th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="consultas" aria-labelledby="query-title">
+        <h2 id="query-title" data-i18n="queryTitle"></h2>
+        <p data-i18n="queryIntro"></p>
+        <div id="presets" class="presets"></div>
+        <label class="sr-only" for="sql" data-i18n="sqlLabel"></label>
+        <textarea id="sql" spellcheck="false"></textarea>
+        <button type="button" id="query" data-i18n="queryRun"></button>
+        <p id="query-meta" class="meta" role="status"></p>
+        <div class="scroll">
+          <table id="result">
+            <thead></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="linaje" aria-labelledby="lineage-title">
+        <h2 id="lineage-title" data-i18n="lineageTitle"></h2>
+        <p data-i18n="lineageIntro"></p>
+        <form id="lineage-form" class="controls">
+          <label class="field">
+            <span data-i18n="lineageLabel"></span>
+            <input id="order-id" value="ORD-20261102-00001" autocomplete="off" spellcheck="false" />
+          </label>
+          <button type="submit" id="lineage-btn" class="secondary" data-i18n="lineageRun" disabled></button>
+        </form>
+        <p id="lineage-note" class="meta"></p>
+        <div class="scroll">
+          <table id="lineage">
+            <thead>
+              <tr>
+                <th data-i18n="colOffset"></th>
+                <th data-i18n="colEvent"></th>
+                <th data-i18n="colType"></th>
+                <th data-i18n="colScan"></th>
+                <th data-i18n="colTime"></th>
+                <th data-i18n="colMx"></th>
+                <th data-i18n="colDate"></th>
+                <th data-i18n="colLate"></th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="arquitectura" aria-labelledby="arch-title">
+        <h2 id="arch-title" data-i18n="archTitle"></h2>
+        <figure>
+          <div id="diagram-flow" class="diagram" role="img"></div>
+          <figcaption data-i18n="archCaption"></figcaption>
+        </figure>
+        <figure>
+          <div id="diagram-ack" class="diagram" role="img"></div>
+          <figcaption data-i18n="ackCaption"></figcaption>
+        </figure>
+      </section>
+
+      <section id="referencia" aria-labelledby="ref-title">
+        <h2 id="ref-title" data-i18n="refTitle"></h2>
+        <p data-i18n="refSource"></p>
+        <div class="scroll block">
+          <table>
+            <thead>
+              <tr>
+                <th data-i18n="refRowsLabel"></th>
+                <th data-i18n="refValueLabel"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td data-i18n="ref_orders"></td><td class="num">120</td></tr>
+              <tr><td data-i18n="ref_cancelled"></td><td class="num">12</td></tr>
+              <tr><td data-i18n="ref_released"></td><td class="num">108</td></tr>
+              <tr><td data-i18n="ref_inventory"></td><td class="num">132</td></tr>
+              <tr><td data-i18n="ref_scans"></td><td class="num">432</td></tr>
+              <tr><td data-i18n="ref_unique"></td><td class="num">684</td></tr>
+              <tr><td data-i18n="ref_published"></td><td class="num">688</td></tr>
+              <tr><td data-i18n="ref_rows"></td><td class="num">684</td></tr>
+              <tr><td data-i18n="ref_dupes"></td><td class="num">4</td></tr>
+              <tr><td data-i18n="ref_late"></td><td class="num">3</td></tr>
+              <tr><td data-i18n="ref_rejects"></td><td class="num">0</td></tr>
+              <tr><td data-i18n="ref_mart"></td><td class="num">53</td></tr>
+              <tr><td data-i18n="ref_mart_events"></td><td class="num">684</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="meta" data-i18n="refSecond"></p>
+        <p class="meta" data-i18n="refSeed"></p>
+      </section>
+
+      <section id="limites" aria-labelledby="limits-title">
+        <h2 id="limits-title" data-i18n="limitsTitle"></h2>
+        <ul class="limits">
+          <li data-i18n="limitMemory"></li>
+          <li data-i18n="limitRedis"></li>
+          <li>
+            <span data-i18n="limitBq"></span>
+            <a href="https://github.com/Eflores1122/streaming-events-warehouse/blob/main/src/andensur/sql/bigquery_events.sql">bigquery_events.sql</a>
+          </li>
+          <li>
+            <span data-i18n="limitAirflow"></span>
+            <a href="https://github.com/Eflores1122/streaming-events-warehouse/blob/main/dags/andensur_catchup_compact.py">andensur_catchup_compact.py</a>
+          </li>
+          <li data-i18n="limitFresh"></li>
+          <li data-i18n="limitWasm"></li>
+        </ul>
+      </section>
+    </main>
+    <footer class="wrap">
+      <p>
+        <span data-i18n="footerName"></span>
+        <a href="https://github.com/Eflores1122">github.com/Eflores1122</a>.
+        <a href="https://github.com/Eflores1122/streaming-events-warehouse">streaming-events-warehouse</a>.
+        MIT.
+      </p>
+      <p class="colophon" data-i18n="colophon"></p>
+    </footer>
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>

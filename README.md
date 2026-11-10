@@ -1,5 +1,7 @@
 # Andén Sur streaming warehouse
 
+**Site:** https://eflores1122.github.io/streaming-events-warehouse/
+
 Reference implementation by **Edgar Flores**, Data & AI Engineer (Mexico).
 
 This repository is a streaming reference for **Andén Sur**, a fictitious Mexican e-commerce fulfillment floor. It receives retail orders, scans inventory on the pick face, and scans shipments as cartons move between hubs. A Python generator publishes JSON events, a consumer micro-batches them, and DuckDB keeps one row per `event_id`.
@@ -12,6 +14,7 @@ No GCP project and no credentials are required.
 
 | Piece | Local / CI | Production-shaped target |
 | --- | --- | --- |
+| Browser page | [GitHub Pages](https://eflores1122.github.io/streaming-events-warehouse/). DuckDB-WASM and the in-memory stand-in. | Same generator and the same `event_id` insert. Not a broker and not BigQuery. |
 | Events | Synthetic generator, fixed epoch, seed 42 | A real order, inventory, and shipment feed. Not this repository. |
 | Broker | Redis Streams when you run Compose or `--broker redis`. The default smoke test uses the stand-in. | Kafka, Redpanda, or Pub/Sub. Same contract: read, process, ack. |
 | Consumer | Micro-batches. Ack runs after the DuckDB commit. | The same ack-after-commit rule. |
@@ -23,7 +26,9 @@ No GCP project and no credentials are required.
 
 Redis Streams is the Compose broker because consumer groups, pending entries, and ack are server features, and the Python client does not need a native library. CI starts Redis 7 as a service and also runs the smoke test with no broker process. The stand-in is that process-free path. It is labeled in the demo output as `stand-in (local consumer-group stand-in; not Redis Streams and not Kafka)`. Redpanda or Kafka would sit behind the same read/ack contract. This repository does not ship a Kafka client.
 
-The BigQuery statements in [`src/andensur/sql/bigquery_events.sql`](src/andensur/sql/bigquery_events.sql) are a target shape. Nothing in the demo or in CI executes them.
+The BigQuery statements in [`src/andensur/sql/bigquery_events.sql`](src/andensur/sql/bigquery_events.sql) are a target shape. Nothing in the demo, the browser page, or CI executes them.
+
+The browser page runs a JavaScript port of `build_events`. CI diffs that JSONL against `python -m andensur generate`. The page then micro-batches into DuckDB-WASM with the same insert rule as `warehouse.py`: the first `event_id` wins, a row is late against the watermark minus 6 hours, and you can query the tables. Redis, BigQuery, and the Airflow DAG stay off the page. The reference counts below are still the CLI measurement.
 
 ## Architecture
 
@@ -266,6 +271,18 @@ PY
 
 `data/` is gitignored.
 
+### Browser page
+
+Node 22. The dev server serves the static session. The first pipeline run downloads the DuckDB module.
+
+```bash
+cd site
+npm ci
+npm run dev
+```
+
+`npm run build` writes `site/dist`. GitHub Actions uploads that directory with `actions/upload-pages-artifact` and deploys it with `actions/deploy-pages` on a push to `main`.
+
 ### Docker Compose
 
 Redis 7 and a one-shot pipeline. The pipeline container runs the same `demo` command with `--broker redis` and `--fresh`.
@@ -292,6 +309,8 @@ python -m andensur demo --orders 40 --seed 42 --fresh --broker stand-in
 ```
 
 The workflow has no secrets and does not call a cloud warehouse. `ANDENSUR_REQUIRE_REDIS=1` makes the Redis test fail instead of skip. Locally, without Redis, that test skips and the stand-in suite still runs.
+
+A second job installs the package, diffs the browser generator against `python -m andensur generate` for 1, 2, 40, and 120 orders, and builds `site/`. The Pages workflow is separate and only deploys from `main`.
 
 Covered cases: generator counts, exact seed-42 sample, primary-key dedup inside a batch and across batches, rollback when the batch record fails, pending redelivery, two consumers splitting offsets, claim of an unacked batch, reject-and-ack, freshness pass and fail, a bad inventory quantity, idempotent compaction, archive catch-up followed by a stream consume, the CLI exit code, the BigQuery file's `MERGE` and partition clause, and the DAG's `catchup=False` / `max_active_runs=1` contract.
 
