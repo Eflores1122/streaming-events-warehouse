@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 
 import duckdb
 
+from andensur.broker import Broker
 from andensur.models import BatchStats, EventRejected, project_event, utcnow, validate_event
 from andensur.warehouse import insert_rejects, merge_events, record_batch
 
@@ -91,7 +92,7 @@ def apply_events(
 
 
 def consume(
-    broker,
+    broker: Broker,
     connection: duckdb.DuckDBPyConnection,
     *,
     stream: str,
