@@ -193,6 +193,12 @@ def test_readme_locks_the_reference_counts_and_the_disclaimer():
     assert "688" in readme
     assert "Sintetico042000" in readme
     assert "MIT" in readme
+    assert "five generated types" not in readme
+    assert "order.created" in readme
+    assert "inventory.scanned" in readme
+    assert "shipment.scanned" in readme
+    assert "DuckDB-WASM" in readme
+    assert "ack after commit" in readme
     for phrase in ("production GCP streaming", "runs in production on BigQuery"):
         assert phrase not in readme
     # The sample clock is the generator epoch, not the wall clock of a test run.

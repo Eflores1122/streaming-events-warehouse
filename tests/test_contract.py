@@ -27,6 +27,21 @@ def test_story_is_retail_fulfillment_without_a_tender_rail():
     assert re.search(r"\bcredit\b", blob) is None
 
 
+def test_both_brokers_expose_the_same_read_ack_surface():
+    from andensur.redis_streams import RedisStreamsBroker
+    from andensur.standin import StandInBroker
+
+    required = ("publish", "ensure_group", "read", "ack", "close")
+    for cls in (StandInBroker, RedisStreamsBroker):
+        for name in required:
+            assert callable(getattr(cls, name))
+        assert isinstance(cls.kind, str) and cls.kind
+        assert isinstance(cls.label, str) and cls.label
+    assert StandInBroker.kind == "stand-in"
+    assert RedisStreamsBroker.kind == "redis"
+    assert "not Redis Streams and not Kafka" in StandInBroker.label
+
+
 def test_bigquery_file_is_a_target_shape_and_lists_the_same_columns():
     schema = files("andensur").joinpath("sql/duckdb_schema.sql").read_text(encoding="utf-8")
     target = files("andensur").joinpath("sql/bigquery_events.sql").read_text(encoding="utf-8")

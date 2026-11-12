@@ -12,3 +12,9 @@ dist/
 data/
 .DS_Store
 node_modules/
+.idea/
+.vscode/
+*.swp
+*~
+.env
+.env.*
